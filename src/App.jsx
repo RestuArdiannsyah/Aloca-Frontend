@@ -3,7 +3,7 @@ import reactLogo from "./assets/react.svg";
 import viteLogo from "./assets/vite.svg";
 import heroImg from "./assets/hero.png";
 import "./App.css";
-import { Shell, LoaderCircle, Loader, LoaderPinwheel } from "lucide-react";
+import { Shell, LoaderCircle, Loader, LoaderPinwheel, BirdIcon, Coffee, Music } from "lucide-react";
 
 function App() {
   const [count, setCount] = useState(0);
@@ -30,10 +30,11 @@ function App() {
           Count is {count}
         </button>
         <div className="flex items-center justify-center gap-6">
-          <Shell className="w-32 h-32 animate-spin" />
+          <Coffee className="w-32 h-32 animate-spin" />
         <LoaderCircle className="w-32 h-32 animate-spin" />
         <Loader className="w-32 h-32 animate-spin" />
-        <LoaderPinwheel className="w-32 h-32 animate-spin" />
+        <Music className="w-32 h-32 animate-spin" />
+        <BirdIcon className="w-32 h-32 animate-spin" />
         </div>
       </section>
 
