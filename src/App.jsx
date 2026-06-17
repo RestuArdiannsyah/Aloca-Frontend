@@ -1,15 +1,20 @@
 import "./App.css";
-import { createBrowserRouter } from "react-router";
-import { RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import Layout from "./layouts/Layout";
+import Dashboard from "./pages/user/Dashboard";
 import ErrorPage from "./pages/404";
-import Dashboard from "./pages/Dashboard";
 
 function App() {
   const AlocaRouter = createBrowserRouter([
     {
-      path: "/",
-      element: <Dashboard />,
+      element: <Layout />,
       errorElement: <ErrorPage />,
+      children: [
+        {
+          path: "/",
+          element: <Dashboard />,
+        },
+      ],
     },
   ]);
 
