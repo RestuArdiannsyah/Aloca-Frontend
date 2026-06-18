@@ -1,37 +1,45 @@
-import "./App.css";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import Layout from "./layouts/Layout";
-import Dashboard from "./pages/user/Dashboard";
-import ErrorPage from "./pages/404";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { AuthProvider } from "./context/AuthContext";
+
+import { AppLayout, AuthLayout, AdminLayout } from "./components/layouts/AppLayout";
+
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 
-function App() {
-  const AlocaRouter = createBrowserRouter([
-    {
-      element: <Layout />,
-      errorElement: <ErrorPage />,
-      children: [
-        {
-          path: "/",
-          element: <Dashboard />,
-        },
-      ],
-    },
+import BerandaPage from "./pages/user/BerandaPage";
+import TransaksiPage from "./pages/user/TransaksiPage";
+import KantongPage from "./pages/user/KantongPage";
+import ProfilPage from "./pages/user/ProfilPage";
 
-    {
-      path: "/login",
-      element: <LoginPage />,
-    },
+import AdminPage from "./pages/admin/AdminPage";
 
-    {
-      path: "/register",
-      element: <RegisterPage />,
-    }
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+          </Route>
 
-  ]);
+          <Route element={<AppLayout />}>
+            <Route path="/beranda" element={<BerandaPage />} />
+            <Route path="/transaksi" element={<TransaksiPage />} />
+            <Route path="/kantong" element={<KantongPage />} />
+            <Route path="/profil" element={<ProfilPage />} />
+          </Route>
 
-  return <RouterProvider router={AlocaRouter} />;
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminPage />} />
+          </Route>
+
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </BrowserRouter>
+
+      <Toaster />
+    </AuthProvider>
+  );
 }
-
-export default App;
