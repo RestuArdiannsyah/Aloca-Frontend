@@ -22,7 +22,11 @@ export const AppLayout = () => {
 
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
-
+  // Gunakan lowercase 'admin' — sesuai nilai di database dan JWT payload
+  if (location.pathname.startsWith('/admin') && user?.role !== 'admin') {
+    return <Navigate to="/beranda" replace />;
+  }
+  
   const pageInfo = pageTitles[location.pathname] || { title: 'Aloca.id', subtitle: '' };
 
   return (
@@ -61,7 +65,8 @@ export const AdminLayout = () => {
 
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== 'ADMIN') return <Navigate to="/beranda" replace />;
+  // Gunakan lowercase 'admin' — sesuai nilai di database dan JWT payload
+  if (user?.role !== 'admin') return <Navigate to="/beranda" replace />;
 
   const pageInfo = pageTitles[location.pathname] || { title: 'Admin Panel', subtitle: '' };
 
@@ -89,7 +94,8 @@ export const AuthLayout = () => {
 
   if (loading) return <PageLoader />;
   if (user) {
-    return <Navigate to={user.role === 'ADMIN' ? '/admin' : '/beranda'} replace />;
+    // Gunakan lowercase 'admin' — sesuai nilai di database dan JWT payload
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/beranda'} replace />;
   }
 
   // Mobile: teal gradient centered. Desktop: pages handle their own split layout.

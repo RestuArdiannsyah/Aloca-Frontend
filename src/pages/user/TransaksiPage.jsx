@@ -1,8 +1,4 @@
-import { useState } from "react";
-// import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-// import { addPemasukan, addPengeluaran, transfer, getRiwayat } from '../../api/transaksi';
-// import { getKantong } from '../../api/kantong';
-// import { getKategoriPemasukan, getKategoriPengeluaran } from '../../api/kategori';
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardBody } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Input, Select } from "../../components/ui/Input";
@@ -12,372 +8,314 @@ import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import { formatRupiah, formatDateTime } from "../../utils/format";
 import { TrendingUp, TrendingDown, ArrowLeftRight } from "lucide-react";
 import toast from "react-hot-toast";
+import { ApiService } from "../../services/Services";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const tipeMap = {
-  PEMASUKAN: {
-    label: "Pemasukan",
-    variant: "success",
-    color: "text-green-600",
-  },
-  PENGELUARAN: {
-    label: "Pengeluaran",
-    variant: "danger",
-    color: "text-red-500",
-  },
-  TRANSFER: { label: "Transfer", variant: "info", color: "text-blue-600" },
+  pemasukan:    { label: "Pemasukan",  variant: "success", color: "text-green-600", sign: "+" },
+  pengeluaran:  { label: "Pengeluaran",variant: "danger",  color: "text-red-500",   sign: "-" },
+  pindah_saldo: { label: "Transfer",   variant: "info",    color: "text-blue-600",  sign: "-" },
 };
 
+// Tanggal hari ini dalam format YYYY-MM-DD (untuk input type=date)
+const today = () => new Date().toISOString().split("T")[0];
+
+// ── Form Pemasukan ────────────────────────────────────────────────────────────
 const PemasukanForm = ({ kantong, kategori, onSubmit, loading }) => {
   const [form, setForm] = useState({
-    kantongId: "",
-    kategoriPemasukanId: "",
-    nominal: "",
-    keterangan: "",
+    kantong_id: "",
+    kategori_pemasukan_id: "",
+    jumlah: "",
+    catatan: "",
+    tanggal: today(),
   });
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.kantongId || !form.kategoriPemasukanId || !form.nominal) {
-      toast.error("Harap isi semua field yang wajib");
+    if (!form.kantong_id || !form.kategori_pemasukan_id || !form.jumlah) {
+      toast.error("Kantong, kategori, dan nominal wajib diisi");
       return;
     }
-    onSubmit(form);
+    onSubmit({ ...form, jumlah: parseFloat(form.jumlah) });
   };
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <Input
-        label="Nominal *"
-        name="nominal"
-        type="number"
-        placeholder="0"
-        prefix="Rp"
-        value={form.nominal}
-        onChange={handleChange}
-        min="1"
-      />
-      <Select
-        label="Kantong *"
-        name="kantongId"
-        value={form.kantongId}
-        onChange={handleChange}
-      >
+      <Input label="Nominal *" name="jumlah" type="number" placeholder="0"
+        prefix="Rp" value={form.jumlah} onChange={handle} min="1" />
+      <Select label="Kantong *" name="kantong_id" value={form.kantong_id} onChange={handle}>
         <option value="">Pilih kantong</option>
         {kantong.map((k) => (
-          <option key={k.id} value={k.id}>
-            {k.nama} ({formatRupiah(k.saldo)})
-          </option>
+          <option key={k.id} value={k.id}>{k.nama} ({formatRupiah(k.saldo)})</option>
         ))}
       </Select>
-      <Select
-        label="Kategori *"
-        name="kategoriPemasukanId"
-        value={form.kategoriPemasukanId}
-        onChange={handleChange}
-      >
+      <Select label="Kategori *" name="kategori_pemasukan_id" value={form.kategori_pemasukan_id} onChange={handle}>
         <option value="">Pilih kategori</option>
         {kategori.map((k) => (
-          <option key={k.id} value={k.id}>
-            {k.icon} {k.nama}
-          </option>
+          <option key={k.id} value={k.id}>{k.icon_url ? "" : ""}{k.nama}</option>
         ))}
       </Select>
-      <Input
-        label="Keterangan (opsional)"
-        name="keterangan"
-        placeholder="Keterangan transaksi"
-        value={form.keterangan}
-        onChange={handleChange}
-      />
-      <Button type="submit" size="full" loading={loading}>
-        Tambah Pemasukan
-      </Button>
+      <Input label="Tanggal *" name="tanggal" type="date" value={form.tanggal} onChange={handle} />
+      <Input label="Catatan (opsional)" name="catatan" placeholder="Keterangan transaksi"
+        value={form.catatan} onChange={handle} />
+      <Button type="submit" size="full" loading={loading}>Tambah Pemasukan</Button>
     </form>
   );
 };
 
+// ── Form Pengeluaran ──────────────────────────────────────────────────────────
 const PengeluaranForm = ({ kantong, kategori, onSubmit, loading }) => {
   const [form, setForm] = useState({
-    kantongId: "",
-    kategoriPengeluaranId: "",
-    nominal: "",
-    keterangan: "",
+    kantong_id: "",
+    kategori_pengeluaran_id: "",
+    jumlah: "",
+    catatan: "",
+    tanggal: today(),
   });
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.kantongId || !form.kategoriPengeluaranId || !form.nominal) {
-      toast.error("Harap isi semua field yang wajib");
+    if (!form.kantong_id || !form.kategori_pengeluaran_id || !form.jumlah) {
+      toast.error("Kantong, kategori, dan nominal wajib diisi");
       return;
     }
-    onSubmit(form);
+    onSubmit({ ...form, jumlah: parseFloat(form.jumlah) });
   };
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <Input
-        label="Nominal *"
-        name="nominal"
-        type="number"
-        placeholder="0"
-        prefix="Rp"
-        value={form.nominal}
-        onChange={handleChange}
-        min="1"
-      />
-      <Select
-        label="Kantong *"
-        name="kantongId"
-        value={form.kantongId}
-        onChange={handleChange}
-      >
+      <Input label="Nominal *" name="jumlah" type="number" placeholder="0"
+        prefix="Rp" value={form.jumlah} onChange={handle} min="1" />
+      <Select label="Kantong *" name="kantong_id" value={form.kantong_id} onChange={handle}>
         <option value="">Pilih kantong</option>
         {kantong.map((k) => (
-          <option key={k.id} value={k.id}>
-            {k.nama} ({formatRupiah(k.saldo)})
-          </option>
+          <option key={k.id} value={k.id}>{k.nama} ({formatRupiah(k.saldo)})</option>
         ))}
       </Select>
-      <Select
-        label="Kategori *"
-        name="kategoriPengeluaranId"
-        value={form.kategoriPengeluaranId}
-        onChange={handleChange}
-      >
+      <Select label="Kategori *" name="kategori_pengeluaran_id" value={form.kategori_pengeluaran_id} onChange={handle}>
         <option value="">Pilih kategori</option>
         {kategori.map((k) => (
-          <option key={k.id} value={k.id}>
-            {k.icon} {k.nama}
-          </option>
+          <option key={k.id} value={k.id}>{k.nama}</option>
         ))}
       </Select>
-      <Input
-        label="Keterangan (opsional)"
-        name="keterangan"
-        placeholder="Keterangan transaksi"
-        value={form.keterangan}
-        onChange={handleChange}
-      />
-      <Button type="submit" size="full" loading={loading}>
-        Catat Pengeluaran
-      </Button>
+      <Input label="Tanggal *" name="tanggal" type="date" value={form.tanggal} onChange={handle} />
+      <Input label="Catatan (opsional)" name="catatan" placeholder="Keterangan transaksi"
+        value={form.catatan} onChange={handle} />
+      <Button type="submit" size="full" loading={loading}>Catat Pengeluaran</Button>
     </form>
   );
 };
 
+// ── Form Pindah Saldo ─────────────────────────────────────────────────────────
 const TransferForm = ({ kantong, onSubmit, loading }) => {
   const [form, setForm] = useState({
-    kantongAsalId: "",
-    kantongTujuanId: "",
-    nominal: "",
-    keterangan: "",
+    kantong_asal_id: "",
+    kantong_tujuan_id: "",
+    jumlah: "",
+    catatan: "",
+    tanggal: today(),
   });
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.kantongAsalId || !form.kantongTujuanId || !form.nominal) {
-      toast.error("Harap isi semua field yang wajib");
+    if (!form.kantong_asal_id || !form.kantong_tujuan_id || !form.jumlah) {
+      toast.error("Semua field wajib diisi");
       return;
     }
-    if (form.kantongAsalId === form.kantongTujuanId) {
+    if (form.kantong_asal_id === form.kantong_tujuan_id) {
       toast.error("Kantong asal dan tujuan tidak boleh sama");
       return;
     }
-    onSubmit(form);
+    onSubmit({ ...form, jumlah: parseFloat(form.jumlah) });
   };
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <Input
-        label="Nominal *"
-        name="nominal"
-        type="number"
-        placeholder="0"
-        prefix="Rp"
-        value={form.nominal}
-        onChange={handleChange}
-        min="1"
-      />
-      <Select
-        label="Dari Kantong *"
-        name="kantongAsalId"
-        value={form.kantongAsalId}
-        onChange={handleChange}
-      >
+      <Input label="Nominal *" name="jumlah" type="number" placeholder="0"
+        prefix="Rp" value={form.jumlah} onChange={handle} min="1" />
+      <Select label="Dari Kantong *" name="kantong_asal_id" value={form.kantong_asal_id} onChange={handle}>
         <option value="">Pilih kantong asal</option>
         {kantong.map((k) => (
-          <option key={k.id} value={k.id}>
-            {k.nama} ({formatRupiah(k.saldo)})
-          </option>
+          <option key={k.id} value={k.id}>{k.nama} ({formatRupiah(k.saldo)})</option>
         ))}
       </Select>
-      <Select
-        label="Ke Kantong *"
-        name="kantongTujuanId"
-        value={form.kantongTujuanId}
-        onChange={handleChange}
-      >
+      <Select label="Ke Kantong *" name="kantong_tujuan_id" value={form.kantong_tujuan_id} onChange={handle}>
         <option value="">Pilih kantong tujuan</option>
         {kantong
-          .filter((k) => k.id !== parseInt(form.kantongAsalId))
+          .filter((k) => k.id !== parseInt(form.kantong_asal_id))
           .map((k) => (
-            <option key={k.id} value={k.id}>
-              {k.nama} ({formatRupiah(k.saldo)})
-            </option>
+            <option key={k.id} value={k.id}>{k.nama} ({formatRupiah(k.saldo)})</option>
           ))}
       </Select>
-      <Input
-        label="Keterangan (opsional)"
-        name="keterangan"
-        placeholder="Keterangan transfer"
-        value={form.keterangan}
-        onChange={handleChange}
-      />
-      <Button type="submit" size="full" loading={loading}>
-        Transfer Saldo
-      </Button>
+      <Input label="Tanggal *" name="tanggal" type="date" value={form.tanggal} onChange={handle} />
+      <Input label="Catatan (opsional)" name="catatan" placeholder="Keterangan transfer"
+        value={form.catatan} onChange={handle} />
+      <Button type="submit" size="full" loading={loading}>Transfer Saldo</Button>
     </form>
   );
 };
 
+// ── Baris riwayat transaksi ───────────────────────────────────────────────────
 const TransaksiRow = ({ t }) => {
-  const meta = tipeMap[t.tipe];
+  const meta = tipeMap[t.tipe] || tipeMap.pengeluaran;
+  const label =
+    t.tipe === "pemasukan"
+      ? t.kategori_pemasukan || "Pemasukan"
+      : t.tipe === "pindah_saldo"
+        ? `Transfer → ${t.kantong_tujuan_nama || "Kantong Tujuan"}`
+        : t.kategori_pengeluaran || "Pengeluaran";
+
   return (
     <div className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
-      <div
-        className={`w-10 h-10 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${
-          t.tipe === "PEMASUKAN"
-            ? "bg-green-50"
-            : t.tipe === "TRANSFER"
-              ? "bg-blue-50"
-              : "bg-red-50"
-        }`}
-      >
-        {t.tipe === "PEMASUKAN"
-          ? t.kategoriPemasukan?.icon || "💰"
-          : t.tipe === "TRANSFER"
-            ? "↔️"
-            : t.kategoriPengeluaran?.icon || "💸"}
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${
+        t.tipe === "pemasukan" ? "bg-green-50" : t.tipe === "pindah_saldo" ? "bg-blue-50" : "bg-red-50"
+      }`}>
+        {t.tipe === "pemasukan" ? "💰" : t.tipe === "pindah_saldo" ? "↔️" : "💸"}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium text-gray-800 truncate">
-            {t.tipe === "PEMASUKAN"
-              ? t.kategoriPemasukan?.nama
-              : t.tipe === "TRANSFER"
-                ? `Transfer → ${t.kantongTujuan?.nama || 'Kantong Tujuan'}`
-                : t.kategoriPengeluaran?.nama}
-          </p>
+          <p className="text-sm font-medium text-gray-800 truncate">{label}</p>
           <Badge variant={meta.variant} className="text-[10px] flex-shrink-0">
             {meta.label}
           </Badge>
         </div>
         <p className="text-xs text-gray-400 mt-0.5 truncate">
-          {t.kantong?.nama} · {formatDateTime(t.createdAt)}
+          {t.kantong_nama} · {t.tanggal}
         </p>
-        {t.keterangan && (
-          <p className="text-xs italic text-gray-400 truncate">
-            "{t.keterangan}"
-          </p>
+        {t.catatan && (
+          <p className="text-xs italic text-gray-400 truncate">"{t.catatan}"</p>
         )}
       </div>
       <span className={`text-sm font-semibold flex-shrink-0 ${meta.color}`}>
-        {t.tipe === "PEMASUKAN" ? "+" : "-"}
-        {formatRupiah(t.nominal)}
+        {meta.sign}{formatRupiah(t.jumlah)}
       </span>
     </div>
   );
 };
 
+// ── Halaman Utama ─────────────────────────────────────────────────────────────
 export const TransaksiPage = () => {
   const [modal, setModal] = useState(null);
-  const [page, setPage] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Deklarasi tiruan riwayatData jika belum di-import/di-fetch agar tidak memicu eror baru
-  const riwayatData = undefined; 
+  const [transaksi, setTransaksi]           = useState([]);
+  const [kantong, setKantong]               = useState([]);
+  const [kategoriPemasukan, setKatPemasukan]   = useState([]);
+  const [kategoriPengeluaran, setKatPengeluaran] = useState([]);
+  const [isLoading, setIsLoading]           = useState(true);
 
-  const kantong = [
-    { id: 1, nama: "Tabungan", saldo: 2500000 },
-    { id: 2, nama: "Dompet", saldo: 500000 },
-  ];
+  // offset/limit sederhana
+  const [offset, setOffset] = useState(0);
+  const LIMIT = 20;
 
-  const kategoriPemasukan = [{ id: 1, nama: "Gaji", icon: "💰" }];
+  // Fetch semua data yang dibutuhkan
+  const fetchAll = useCallback(async (newOffset = 0) => {
+    setIsLoading(true);
+    try {
+      const [riwayat, kantongRes, katP, katPen] = await Promise.all([
+        ApiService.getRiwayatTransaksi({ limit: LIMIT, offset: newOffset }),
+        ApiService.getSemuaKantong(),
+        ApiService.getKategoriPemasukan(),
+        ApiService.getKategoriPengeluaran(),
+      ]);
+      if (newOffset === 0) {
+        setTransaksi(riwayat.data || []);
+      } else {
+        setTransaksi((prev) => [...prev, ...(riwayat.data || [])]);
+      }
+      setKantong(kantongRes.data || []);
+      setKatPemasukan(katP.data || []);
+      setKatPengeluaran(katPen.data || []);
+      setOffset(newOffset);
+    } catch (err) {
+      toast.error(err.message || "Gagal memuat data transaksi");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  const kategoriPengeluaran = [{ id: 1, nama: "Makan", icon: "🍜" }];
+  useEffect(() => { fetchAll(0); }, [fetchAll]);
 
-  // Digabungkan langsung menggunakan operator fallback (||)
-  const transaksi = riwayatData?.transaksi || [
-    {
-      id: 1,
-      tipe: "PEMASUKAN",
-      nominal: 1500000,
-      createdAt: new Date(),
-      kantong: { nama: "Tabungan" },
-      kategoriPemasukan: { nama: "Gaji", icon: "💰" },
-      keterangan: "Gaji Bulanan",
-    },
-  ];
-
-  // Digabungkan langsung menggunakan operator fallback (||)
-  const pagination = riwayatData?.pagination || {
-    totalPages: 1,
+  // Refresh kantong saja setelah transaksi (saldo berubah)
+  const refreshKantong = async () => {
+    try {
+      const res = await ApiService.getSemuaKantong();
+      setKantong(res.data || []);
+    } catch (_) {}
   };
 
-  const isLoading = false;
-
-  const handlePemasukan = () => {
-    toast.success("Pemasukan berhasil ditambahkan");
-    setModal(null);
+  // ── Handler submit ──────────────────────────────────────────────────────────
+  const handlePemasukan = async (formData) => {
+    setSubmitting(true);
+    try {
+      await ApiService.tambahPemasukan(formData);
+      toast.success("Pemasukan berhasil ditambahkan");
+      setModal(null);
+      await Promise.all([fetchAll(0), refreshKantong()]);
+    } catch (err) {
+      toast.error(err.message || "Gagal menambah pemasukan");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handlePengeluaran = () => {
-    toast.success("Pengeluaran berhasil ditambahkan");
-    setModal(null);
+  const handlePengeluaran = async (formData) => {
+    setSubmitting(true);
+    try {
+      await ApiService.tambahPengeluaran(formData);
+      toast.success("Pengeluaran berhasil dicatat");
+      setModal(null);
+      await Promise.all([fetchAll(0), refreshKantong()]);
+    } catch (err) {
+      toast.error(err.message || "Gagal mencatat pengeluaran");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleTransfer = () => {
-    toast.success("Transfer berhasil");
-    setModal(null);
+  const handleTransfer = async (formData) => {
+    setSubmitting(true);
+    try {
+      await ApiService.pindahSaldo(formData);
+      toast.success("Transfer saldo berhasil");
+      setModal(null);
+      await Promise.all([fetchAll(0), refreshKantong()]);
+    } catch (err) {
+      toast.error(err.message || "Gagal transfer saldo");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="px-4 pt-6 space-y-5 lg:pt-0 lg:px-0">
-      {/* Mobile page title */}
+      {/* Mobile title */}
       <div className="lg:hidden">
         <h1 className="text-xl font-bold text-gray-900">Transaksi</h1>
-        <p className="text-sm text-gray-500">
-          Kelola pemasukan &amp; pengeluaran
-        </p>
+        <p className="text-sm text-gray-500">Kelola pemasukan &amp; pengeluaran</p>
       </div>
 
-      {/* ── Action buttons ── */}
+      {/* ── Tombol aksi ── */}
       <div className="grid grid-cols-3 gap-3">
-        <button
-          onClick={() => setModal("pemasukan")}
-          className="flex flex-col items-center gap-2 py-4 transition-colors border border-green-100 bg-green-50 rounded-2xl hover:bg-green-100"
-        >
+        <button onClick={() => setModal("pemasukan")}
+          className="flex flex-col items-center gap-2 py-4 transition-colors border border-green-100 bg-green-50 rounded-2xl hover:bg-green-100">
           <div className="flex items-center justify-center w-10 h-10 bg-green-500 rounded-full">
             <TrendingUp size={18} className="text-white" />
           </div>
-          <span className="text-xs font-semibold text-green-700">
-            Pemasukan
-          </span>
+          <span className="text-xs font-semibold text-green-700">Pemasukan</span>
         </button>
-        <button
-          onClick={() => setModal("pengeluaran")}
-          className="flex flex-col items-center gap-2 py-4 transition-colors border border-red-100 bg-red-50 rounded-2xl hover:bg-red-100"
-        >
+        <button onClick={() => setModal("pengeluaran")}
+          className="flex flex-col items-center gap-2 py-4 transition-colors border border-red-100 bg-red-50 rounded-2xl hover:bg-red-100">
           <div className="flex items-center justify-center w-10 h-10 bg-red-500 rounded-full">
             <TrendingDown size={18} className="text-white" />
           </div>
-          <span className="text-xs font-semibold text-red-700">
-            Pengeluaran
-          </span>
+          <span className="text-xs font-semibold text-red-700">Pengeluaran</span>
         </button>
-        <button
-          onClick={() => setModal("transfer")}
-          className="flex flex-col items-center gap-2 py-4 transition-colors border border-blue-100 bg-blue-50 rounded-2xl hover:bg-blue-100"
-        >
+        <button onClick={() => setModal("transfer")}
+          className="flex flex-col items-center gap-2 py-4 transition-colors border border-blue-100 bg-blue-50 rounded-2xl hover:bg-blue-100">
           <div className="flex items-center justify-center w-10 h-10 bg-blue-500 rounded-full">
             <ArrowLeftRight size={18} className="text-white" />
           </div>
@@ -389,75 +327,50 @@ export const TransaksiPage = () => {
       <div>
         <h2 className="mb-3 font-semibold text-gray-900">Riwayat Transaksi</h2>
 
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <LoadingSpinner />
-          </div>
+        {isLoading && transaksi.length === 0 ? (
+          <div className="flex justify-center py-12"><LoadingSpinner /></div>
         ) : transaksi.length === 0 ? (
           <Card>
             <CardBody className="py-12 text-center">
-              <ArrowLeftRight
-                size={32}
-                className="mx-auto mb-3 text-gray-300"
-              />
+              <ArrowLeftRight size={32} className="mx-auto mb-3 text-gray-300" />
               <p className="text-sm text-gray-400">Belum ada transaksi</p>
-              <p className="mt-1 text-xs text-gray-400">
-                Mulai catat pemasukan atau pengeluaran
-              </p>
+              <p className="mt-1 text-xs text-gray-400">Mulai catat pemasukan atau pengeluaran</p>
             </CardBody>
           </Card>
         ) : (
           <>
             <Card>
               <CardBody className="py-2">
-                {/* Desktop: 2 column layout */}
                 <div className="lg:grid lg:grid-cols-2 lg:gap-x-6">
                   <div>
-                    {transaksi
-                      .slice(0, Math.ceil(transaksi.length / 2))
-                      .map((t) => (
-                        <TransaksiRow key={t.id} t={t} />
-                      ))}
+                    {transaksi.slice(0, Math.ceil(transaksi.length / 2)).map((t) => (
+                      <TransaksiRow key={t.id} t={t} />
+                    ))}
                   </div>
                   <div className="hidden pl-6 border-l lg:block border-gray-50">
-                    {transaksi
-                      .slice(Math.ceil(transaksi.length / 2))
-                      .map((t) => (
-                        <TransaksiRow key={t.id} t={t} />
-                      ))}
+                    {transaksi.slice(Math.ceil(transaksi.length / 2)).map((t) => (
+                      <TransaksiRow key={t.id} t={t} />
+                    ))}
                   </div>
-                  {/* Mobile: rest of items */}
                   <div className="lg:hidden">
-                    {transaksi
-                      .slice(Math.ceil(transaksi.length / 2))
-                      .map((t) => (
-                        <TransaksiRow key={t.id} t={t} />
-                      ))}
+                    {transaksi.slice(Math.ceil(transaksi.length / 2)).map((t) => (
+                      <TransaksiRow key={t.id} t={t} />
+                    ))}
                   </div>
                 </div>
               </CardBody>
             </Card>
 
-            {pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4">
+            {/* Load more */}
+            {transaksi.length >= LIMIT && (
+              <div className="mt-4 text-center">
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setPage((p) => Math.max(p - 1, 1))}
-                  disabled={page === 1}
+                  loading={isLoading}
+                  onClick={() => fetchAll(offset + LIMIT)}
                 >
-                  ← Sebelumnya
-                </Button>
-                <span className="text-xs text-gray-500">
-                  Hal. {page} / {pagination.totalPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={page >= pagination.totalPages}
-                >
-                  Berikutnya →
+                  Muat lebih banyak
                 </Button>
               </div>
             )}
@@ -465,40 +378,28 @@ export const TransaksiPage = () => {
         )}
       </div>
 
-      {/* Modals */}
-      <Modal
-        isOpen={modal === "pemasukan"}
-        onClose={() => setModal(null)}
-        title="Tambah Pemasukan"
-      >
+      {/* ── Modals ── */}
+      <Modal isOpen={modal === "pemasukan"} onClose={() => setModal(null)} title="Tambah Pemasukan">
         <PemasukanForm
           kantong={kantong}
           kategori={kategoriPemasukan}
           onSubmit={handlePemasukan}
-          loading={false}
+          loading={submitting}
         />
       </Modal>
-      <Modal
-        isOpen={modal === "pengeluaran"}
-        onClose={() => setModal(null)}
-        title="Catat Pengeluaran"
-      >
+      <Modal isOpen={modal === "pengeluaran"} onClose={() => setModal(null)} title="Catat Pengeluaran">
         <PengeluaranForm
           kantong={kantong}
           kategori={kategoriPengeluaran}
           onSubmit={handlePengeluaran}
-          loading={false}
+          loading={submitting}
         />
       </Modal>
-      <Modal
-        isOpen={modal === "transfer"}
-        onClose={() => setModal(null)}
-        title="Transfer Saldo"
-      >
+      <Modal isOpen={modal === "transfer"} onClose={() => setModal(null)} title="Transfer Saldo">
         <TransferForm
           kantong={kantong}
           onSubmit={handleTransfer}
-          loading={false}
+          loading={submitting}
         />
       </Modal>
     </div>

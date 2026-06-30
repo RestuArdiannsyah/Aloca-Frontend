@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const LoginPage = () => {
   const [form, setForm] = useState({
@@ -12,6 +13,10 @@ const LoginPage = () => {
 
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setForm({
@@ -34,18 +39,24 @@ const LoginPage = () => {
     return errs;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const errs = validate();
-
     if (Object.keys(errs).length) {
       setErrors(errs);
       return;
     }
 
-    console.log('Data Login:', form);
-    alert('Login berhasil (Frontend Only)');
+    setIsSubmitting(true);
+    try {
+      const success = await login(form.email, form.password);
+      if (success) {
+  navigate('/beranda'); 
+}
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -145,6 +156,7 @@ const LoginPage = () => {
               value={form.email}
               onChange={handleChange}
               error={errors.email}
+              disabled={isSubmitting}
             />
 
             <div className="relative">
@@ -156,6 +168,7 @@ const LoginPage = () => {
                 value={form.password}
                 onChange={handleChange}
                 error={errors.password}
+                disabled={isSubmitting}
               />
 
               <button
@@ -175,8 +188,9 @@ const LoginPage = () => {
               type="submit"
               size="full"
               className="mt-2"
+              disabled={isSubmitting}
             >
-              Masuk
+              {isSubmitting ? 'Memproses...' : 'Masuk'}
             </Button>
           </form>
 

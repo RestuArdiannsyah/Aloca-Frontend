@@ -1,17 +1,9 @@
 import { useAuth } from '../../context/AuthContext';
-import { Bell, LogOut } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
 
 export const DesktopHeader = ({ title, subtitle }) => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    toast.success('Sampai jumpa!');
-    navigate('/login');
-  };
+  const { user } = useAuth();
 
   return (
     <header className="hidden lg:flex items-center justify-between h-16 px-6 bg-white border-b border-gray-100 sticky top-0 z-30 flex-shrink-0">
@@ -37,7 +29,7 @@ export const DesktopHeader = ({ title, subtitle }) => {
             </span>
           </div>
           <div className="hidden xl:block">
-            <p className="text-sm font-medium text-gray-900 leading-tight">{user?.name}</p>
+            <p className="text-sm font-medium text-gray-900 leading-tight">{user?.name || 'Pengguna'}</p>
             <p className="text-[10px] text-gray-400 leading-tight capitalize">{user?.role?.toLowerCase()}</p>
           </div>
         </div>

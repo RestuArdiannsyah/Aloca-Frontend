@@ -48,7 +48,7 @@ export const ProfilPage = () => {
               </div>
               <h2 className="text-lg font-bold text-gray-900">{user?.name}</h2>
               <p className="text-sm text-gray-500 mt-0.5">{user?.email}</p>
-              {user?.role === 'ADMIN' && (
+              {user?.role === 'admin' && (
                 <div className="mt-3 flex items-center gap-1.5 bg-[#00C2A8]/10 px-3 py-1.5 rounded-full">
                   <Shield size={12} className="text-[#00C2A8]" />
                   <span className="text-xs font-semibold text-[#00C2A8]">Administrator</span>
@@ -83,13 +83,13 @@ export const ProfilPage = () => {
               <InfoRow
                 icon={Shield}
                 label="Role"
-                value={user?.role === 'ADMIN' ? 'Administrator' : 'User'}
+                value={user?.role === 'admin' ? 'Administrator' : 'User'}
               />
             </CardBody>
           </Card>
 
           {/* Admin shortcut */}
-          {user?.role === 'ADMIN' && (
+          {user?.role === 'admin' && (
             <Card>
               <CardBody>
                 <button
