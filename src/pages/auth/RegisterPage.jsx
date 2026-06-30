@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // BARU: Tambah useNavigate
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext'; // BARU: Import useAuth dari context
 
 const RegisterPage = () => {
   const [form, setForm] = useState({
@@ -13,6 +14,10 @@ const RegisterPage = () => {
 
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // BARU: State loading biar user ga klik berkali-kali
+
+  const { register } = useAuth(); // BARU: Ambil fungsi register asli
+  const navigate = useNavigate(); // BARU: Ambil fungsi redirect halaman
 
   const handleChange = (e) => {
     setForm({
@@ -41,19 +46,30 @@ const RegisterPage = () => {
     return errs;
   };
 
-  const handleSubmit = (e) => {
+  // DIUBAH: Menjadi fungsi async karena menembak API backend
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const errs = validate();
-
     if (Object.keys(errs).length) {
       setErrors(errs);
       return;
     }
 
-    console.log('Data Register:', form);
-
-    alert('Registrasi berhasil (Frontend Only)');
+    setIsSubmitting(true);
+    try {
+      // Kirim form.name sebagai username ke backend
+      const success = await register(form.name, form.email, form.password);
+      if (success) {
+        navigate('/login');
+      }
+    } catch (error) {
+      // Error API sudah ditangani di AuthContext (toast), tapi
+      // jika ada error tak terduga tampilkan juga di form
+      setErrors({ general: error.message || 'Terjadi kesalahan, coba lagi.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -150,6 +166,7 @@ const RegisterPage = () => {
               value={form.name}
               onChange={handleChange}
               error={errors.name}
+              disabled={isSubmitting} // BARU: Kunci input saat loading
             />
 
             <Input
@@ -160,10 +177,11 @@ const RegisterPage = () => {
               value={form.email}
               onChange={handleChange}
               error={errors.email}
+              disabled={isSubmitting} // BARU: Kunci input saat loading
             />
 
             <div className="relative">
-            <Input
+              <Input
                 label="Password"
                 type={showPassword ? 'text' : 'password'}
                 name="password"
@@ -171,28 +189,36 @@ const RegisterPage = () => {
                 value={form.password}
                 onChange={handleChange}
                 error={errors.password}
-            />
+                disabled={isSubmitting} // BARU: Kunci input saat loading
+              />
 
-            <button
+              <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-10 text-gray-500 hover:text-gray-700"
-            >
+              >
                 {showPassword ? (
-                <EyeOff size={18} />
+                  <EyeOff size={18} />
                 ) : (
-                <Eye size={18} />
+                  <Eye size={18} />
                 )}
-            </button>
+              </button>
             </div>
 
             <Button
               type="submit"
               size="full"
               className="mt-2"
+              disabled={isSubmitting}
             >
-              Buat Akun
+              {isSubmitting ? 'Mendaftarkan...' : 'Buat Akun'}
             </Button>
+
+            {errors.general && (
+              <p className="text-sm text-red-500 text-center -mt-1">
+                {errors.general}
+              </p>
+            )}
           </form>
 
           <p className="text-center text-sm text-gray-500 mt-6">

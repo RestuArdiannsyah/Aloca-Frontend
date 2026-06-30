@@ -1,9 +1,10 @@
 // import { useQuery } from '@tanstack/react-query';
 // import { getDashboard } from '../../api/dashboard';
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardBody } from "../../components/ui/Card";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
 import { useAuth } from "../../context/AuthContext";
-import { formatRupiah, formatDateTime } from "../../utils/format";
+import { formatRupiah } from "../../utils/format";
 import {
   TrendingUp,
   TrendingDown,
@@ -13,47 +14,35 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { ApiService } from "../../services/Services";
+import toast from "react-hot-toast";
 
 const TransaksiItem = ({ t }) => {
-  const isPemasukan = t.tipe === "PEMASUKAN";
-  const isTransfer = t.tipe === "TRANSFER";
+  const isPemasukan = t.tipe === "pemasukan";
+  const isTransfer = t.tipe === "pindah_saldo";
+  const label = isPemasukan
+    ? t.kategori_pemasukan || "Pemasukan"
+    : isTransfer
+      ? `Transfer → ${t.kantong_tujuan_nama || "Kantong Tujuan"}`
+      : t.kategori_pengeluaran || "Pengeluaran";
 
   return (
     <div className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
-      <div
-        className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
-          isPemasukan ? "bg-green-50" : isTransfer ? "bg-blue-50" : "bg-red-50"
-        }`}
-      >
-        {isPemasukan
-          ? t.kategoriPemasukan?.icon || "💰"
-          : isTransfer
-            ? "↔️"
-            : t.kategoriPengeluaran?.icon || "💸"}
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
+        isPemasukan ? "bg-green-50" : isTransfer ? "bg-blue-50" : "bg-red-50"
+      }`}>
+        {isPemasukan ? "💰" : isTransfer ? "↔️" : "💸"}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-800 truncate">
-          {isPemasukan
-            ? t.kategoriPemasukan?.nama
-            : isTransfer
-              ? `Transfer ke ${t.kantongTujuan?.nama}`
-              : t.kategoriPengeluaran?.nama}
-        </p>
+        <p className="text-sm font-medium text-gray-800 truncate">{label}</p>
         <p className="text-xs text-gray-400 mt-0.5 truncate">
-          {t.kantong?.nama} · {formatDateTime(t.createdAt)}
+          {t.kantong_nama} · {t.tanggal}
         </p>
       </div>
-      <span
-        className={`text-sm font-semibold flex-shrink-0 ${
-          isPemasukan
-            ? "text-green-600"
-            : isTransfer
-              ? "text-blue-600"
-              : "text-red-500"
-        }`}
-      >
-        {isPemasukan ? "+" : "-"}
-        {formatRupiah(t.nominal)}
+      <span className={`text-sm font-semibold flex-shrink-0 ${
+        isPemasukan ? "text-green-600" : isTransfer ? "text-blue-600" : "text-red-500"
+      }`}>
+        {isPemasukan ? "+" : "-"}{formatRupiah(t.jumlah)}
       </span>
     </div>
   );
@@ -62,14 +51,37 @@ const TransaksiItem = ({ t }) => {
 export const BerandaPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isLoading = false;
 
-  const data = {
-    totalSaldo: 2500000,
-    totalPemasukan: 5000000,
-    totalPengeluaran: 2500000,
-    transaksiTerbaru: [],
-  };
+  const [kantong, setKantong]             = useState([]);
+  const [transaksiTerbaru, setTransaksi]  = useState([]);
+  const [isLoading, setIsLoading]         = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [kantongRes, txRes] = await Promise.all([
+        ApiService.getSemuaKantong(),
+        ApiService.getRiwayatTransaksi({ limit: 6 }),
+      ]);
+      setKantong(kantongRes.data || []);
+      setTransaksi(txRes.data || []);
+    } catch (err) {
+      toast.error(err.message || "Gagal memuat data");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Hitung total saldo, pemasukan, pengeluaran dari data yang ada
+  const totalSaldo       = kantong.reduce((sum, k) => sum + parseFloat(k.saldo || 0), 0);
+  const totalPemasukan   = transaksiTerbaru
+    .filter((t) => t.tipe === "pemasukan")
+    .reduce((sum, t) => sum + parseFloat(t.jumlah || 0), 0);
+  const totalPengeluaran = transaksiTerbaru
+    .filter((t) => t.tipe === "pengeluaran")
+    .reduce((sum, t) => sum + parseFloat(t.jumlah || 0), 0);
 
   if (isLoading) {
     return (
@@ -78,14 +90,6 @@ export const BerandaPage = () => {
       </div>
     );
   }
-
-  const {
-    totalSaldo = 0,
-    totalPemasukan = 0,
-    totalPengeluaran = 0,
-    kantong = [],
-    transaksiTerbaru = [],
-  } = data || {};
 
   return (
     <div className="px-4 pt-6 space-y-6 lg:pt-0 lg:px-0">

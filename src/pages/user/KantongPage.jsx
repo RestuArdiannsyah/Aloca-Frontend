@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Input, Textarea } from '../../components/ui/Input';
+import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { formatRupiah } from '../../utils/format';
 import { Plus, Wallet, Target, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { ApiService } from '../../services/Services';
 
+// ── Form buat/edit kantong ────────────────────────────────────────────────────
 const KantongForm = ({ initial = {}, onSubmit, loading }) => {
   const [form, setForm] = useState({
     nama: initial.nama || '',
@@ -23,9 +25,9 @@ const KantongForm = ({ initial = {}, onSubmit, loading }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.nama.trim()) { 
-      setErrors({ nama: 'Nama kantong wajib diisi' }); 
-      return; 
+    if (!form.nama.trim()) {
+      setErrors({ nama: 'Nama kantong wajib diisi' });
+      return;
     }
     onSubmit(form);
   };
@@ -33,14 +35,14 @@ const KantongForm = ({ initial = {}, onSubmit, loading }) => {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <Input
-        label="Nama Kantong"
+        label="Nama Kantong *"
         name="nama"
         placeholder="Contoh: Uang Makan"
         value={form.nama}
         onChange={handleChange}
         error={errors.nama}
       />
-      <Textarea
+      <Input
         label="Deskripsi (opsional)"
         name="deskripsi"
         placeholder="Deskripsi singkat kantong ini..."
@@ -64,59 +66,76 @@ const KantongForm = ({ initial = {}, onSubmit, loading }) => {
   );
 };
 
+// ── Halaman utama ─────────────────────────────────────────────────────────────
 export const KantongPage = () => {
+  const [kantong, setKantong] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editKantong, setEditKantong] = useState(null);
-  
-  // Simulasi loading state
-  const [isLoading] = useState(false);
 
-  // Menggunakan local state sebagai pengganti data dari backend / useQuery
-  const [data, setData] = useState([
-    { id: 1, nama: 'Tabungan Utama', deskripsi: 'Untuk dana darurat', saldo: 2500000, goal: 10000000 },
-    { id: 2, nama: 'Dompet Harian', deskripsi: 'Jajan & makan siang', saldo: 500000, goal: null },
-  ]);
+  // Fetch semua kantong dari backend
+  const fetchKantong = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await ApiService.getSemuaKantong();
+      setKantong(res.data || []);
+    } catch (err) {
+      toast.error(err.message || 'Gagal memuat kantong');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  // Handler Buat Kantong (Simulasi POST)
-  const handleCreate = (formData) => {
-    const newKantong = {
-      id: Date.now(), // Generate id unik menggunakan timestamp
-      nama: formData.nama,
-      deskripsi: formData.deskripsi,
-      saldo: 0, // Kantong baru otomatis dimulai dari Rp 0
-      goal: formData.goal ? parseFloat(formData.goal) : null,
-    };
+  useEffect(() => { fetchKantong(); }, [fetchKantong]);
 
-    setData([...data, newKantong]);
-    setShowCreate(false);
-    toast.success('Kantong berhasil dibuat!');
+  // Buat kantong baru → POST /api/kantong
+  const handleCreate = async (formData) => {
+    setSubmitting(true);
+    try {
+      await ApiService.buatKantong({
+        nama: formData.nama,
+        deskripsi: formData.deskripsi || null,
+        goal: formData.goal ? parseFloat(formData.goal) : 0,
+      });
+      toast.success('Kantong berhasil dibuat!');
+      setShowCreate(false);
+      fetchKantong(); // Refresh list
+    } catch (err) {
+      toast.error(err.message || 'Gagal membuat kantong');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // Handler Edit Kantong (Simulasi PUT/PATCH)
-  const handleUpdate = (formData) => {
-    const updatedData = data.map((item) => {
-      if (item.id === editKantong.id) {
-        return {
-          ...item,
-          nama: formData.nama,
-          deskripsi: formData.deskripsi,
-          goal: formData.goal ? parseFloat(formData.goal) : null,
-        };
-      }
-      return item;
-    });
-
-    setData(updatedData);
-    setEditKantong(null);
-    toast.success('Kantong berhasil diperbarui!');
+  // Edit kantong → PUT /api/kantong/:id
+  const handleUpdate = async (formData) => {
+    setSubmitting(true);
+    try {
+      await ApiService.editKantong(editKantong.id, {
+        nama: formData.nama,
+        deskripsi: formData.deskripsi || null,
+        goal: formData.goal ? parseFloat(formData.goal) : null,
+      });
+      toast.success('Kantong berhasil diperbarui!');
+      setEditKantong(null);
+      fetchKantong();
+    } catch (err) {
+      toast.error(err.message || 'Gagal memperbarui kantong');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // Handler Hapus Kantong (Simulasi DELETE)
-  const handleDelete = (k) => {
-    if (confirm(`Hapus kantong "${k.nama}"? Seluruh data transaksi terkait juga akan terhapus.`)) {
-      const filteredData = data.filter((item) => item.id !== k.id);
-      setData(filteredData);
+  // Hapus kantong → DELETE /api/kantong/:id
+  const handleDelete = async (k) => {
+    if (!confirm(`Hapus kantong "${k.nama}"? Seluruh data transaksi terkait juga akan terhapus.`)) return;
+    try {
+      await ApiService.hapusKantong(k.id);
       toast.success('Kantong berhasil dihapus');
+      fetchKantong();
+    } catch (err) {
+      toast.error(err.message || 'Gagal menghapus kantong');
     }
   };
 
@@ -134,7 +153,7 @@ export const KantongPage = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-gray-900 lg:hidden">Kantong</h1>
-          <p className="text-sm text-gray-500">{data?.length || 0} kantong aktif</p>
+          <p className="text-sm text-gray-500">{kantong.length} kantong aktif</p>
         </div>
         <Button onClick={() => setShowCreate(true)} size="sm">
           <Plus size={16} /> Buat Kantong
@@ -142,7 +161,7 @@ export const KantongPage = () => {
       </div>
 
       {/* Empty state */}
-      {(!data || data.length === 0) ? (
+      {kantong.length === 0 ? (
         <div className="py-20 text-center">
           <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full">
             <Wallet size={24} className="text-gray-400" />
@@ -154,9 +173,8 @@ export const KantongPage = () => {
           </Button>
         </div>
       ) : (
-        /* Responsive grid */
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {data.map((k) => (
+          {kantong.map((k) => (
             <Card key={k.id}>
               <CardBody>
                 <div className="flex items-start gap-3">
@@ -171,13 +189,15 @@ export const KantongPage = () => {
                           onClick={() => setEditKantong(k)}
                           className="flex items-center justify-center transition-colors bg-gray-100 rounded-lg w-7 h-7 hover:bg-gray-200"
                           title="Edit"
+                          disabled={k.is_default === 1}
                         >
                           <Pencil size={13} className="text-gray-600" />
                         </button>
                         <button
                           onClick={() => handleDelete(k)}
-                          className="flex items-center justify-center transition-colors rounded-lg w-7 h-7 bg-red-50 hover:bg-red-100"
-                          title="Hapus"
+                          className="flex items-center justify-center transition-colors rounded-lg w-7 h-7 bg-red-50 hover:bg-red-100 disabled:opacity-30"
+                          title={k.is_default ? 'Kantong utama tidak bisa dihapus' : 'Hapus'}
+                          disabled={k.is_default === 1}
                         >
                           <Trash2 size={13} className="text-red-500" />
                         </button>
@@ -186,8 +206,13 @@ export const KantongPage = () => {
                     {k.deskripsi && (
                       <p className="text-xs text-gray-400 mt-0.5 truncate">{k.deskripsi}</p>
                     )}
+                    {k.is_default === 1 && (
+                      <span className="inline-block text-[10px] font-semibold text-[#00C2A8] bg-[#00C2A8]/10 px-2 py-0.5 rounded-full mt-1">
+                        Kantong Utama
+                      </span>
+                    )}
                     <p className="mt-2 text-lg font-bold text-gray-900">{formatRupiah(k.saldo)}</p>
-                    {k.goal && (
+                    {k.goal > 0 && (
                       <div className="mt-2">
                         <div className="flex items-center gap-2 mb-1 text-xs text-gray-500">
                           <Target size={11} className="text-[#00C2A8]" />
@@ -211,22 +236,15 @@ export const KantongPage = () => {
         </div>
       )}
 
-      {/* Modal Create */}
+      {/* Modal Buat */}
       <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Buat Kantong Baru">
-        <KantongForm
-          onSubmit={handleCreate}
-          loading={false}
-        />
+        <KantongForm onSubmit={handleCreate} loading={submitting} />
       </Modal>
 
       {/* Modal Edit */}
       <Modal isOpen={!!editKantong} onClose={() => setEditKantong(null)} title="Edit Kantong">
         {editKantong && (
-          <KantongForm
-            initial={editKantong}
-            onSubmit={handleUpdate}
-            loading={false}
-          />
+          <KantongForm initial={editKantong} onSubmit={handleUpdate} loading={submitting} />
         )}
       </Modal>
     </div>

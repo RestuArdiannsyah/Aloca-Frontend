@@ -75,7 +75,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
           <NavItem key={item.to} {...item} collapsed={collapsed} />
         ))}
 
-        {user?.role === 'ADMIN' && (
+        {user?.role === 'admin' && (
           <>
             <div className={`my-3 border-t border-gray-100 ${collapsed ? '' : ''}`} />
             {!collapsed && (
