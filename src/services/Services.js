@@ -1,4 +1,5 @@
-const API_URL = "https://aloca-backend-production.up.railway.app/api";
+//const API_URL = "https://aloca-backend-production.up.railway.app/api";
+const API_URL = "http://localhost:3000/api";
 
 // Helper: request JSON dengan JWT otomatis
 const fetchWithAuth = async (endpoint, options = {}) => {
@@ -49,6 +50,29 @@ export const ApiService = {
 
   pindahSaldo: (data) =>
     fetchWithAuth("/transaksi/pindah-saldo", { method: "POST", body: JSON.stringify(data) }),
+
+  /**
+   * Mengunduh rekap transaksi dalam bentuk file Blob (Excel binary stream)
+   */
+  downloadExcel: async () => {
+    const token = localStorage.getItem("aloca_token");
+    
+    const response = await fetch(`${API_URL}/transaksi/download/excel`, {
+      method: "GET",
+      headers: {
+        "Authorization": token ? `Bearer ${token}` : ""
+      }
+    });
+
+    if (!response.ok) {
+      // Jika error, coba parsing pesan error-nya dari JSON
+      const errorResult = await response.json().catch(() => ({}));
+      throw new Error(errorResult.message || "Gagal mengunduh rekap transaksi");
+    }
+
+    // Mengembalikan data sebagai Blob file mentah (.xlsx)
+    return await response.blob();
+  },
 
   // ── KATEGORI (admin only) ─────────────────────────────────────────────────
   getKategoriPemasukan: () =>
