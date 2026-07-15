@@ -245,12 +245,13 @@ export const TransaksiPage = () => {
   const [kategoriPemasukan, setKatPemasukan]   = useState([]);
   const [kategoriPengeluaran, setKatPengeluaran] = useState([]);
   const [isLoading, setIsLoading]           = useState(true);
+  const [isDownloading, setIsDownloading]   = useState(false);
 
   // State untuk filter dropdown bulan aktif
   const [selectedBulan, setSelectedBulan] = useState("Semua");
 
   const [offset, setOffset] = useState(0);
-  const LIMIT = 50; // Menaikkan limit untuk mengakomodasi pencarian filter lokal bulanan
+  const LIMIT = 50; // Menyesuaikan limit agar sinkronisasi bulan terambil optimal
 
   const fetchAll = useCallback(async (newOffset = 0) => {
     setIsLoading(true);
@@ -325,6 +326,28 @@ export const TransaksiPage = () => {
       toast.error(err.message || "Gagal transfer saldo");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Fungsi Pemicu Unduh Excel (.xlsx blob)
+  const handleDownloadExcel = async () => {
+    setIsDownloading(true);
+    try {
+      const blobData = await ApiService.downloadExcel();
+      
+      const url = window.URL.createObjectURL(new Blob([blobData]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Rekap_Transaksi_Aloca_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      
+      link.click();
+      link.parentNode.removeChild(link);
+      toast.success("Rekap Excel berhasil diunduh!");
+    } catch (err) {
+      toast.error(err.message || "Gagal mengunduh rekap transaksi");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -416,7 +439,18 @@ export const TransaksiPage = () => {
 
       {/* ── Grid List Riwayat 3 Kolom ── */}
       <div>
-        <h2 className="mb-3 font-semibold text-gray-900">Riwayat Transaksi</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-gray-900">Riwayat Transaksi</h2>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={isDownloading}
+            onClick={handleDownloadExcel}
+            className="flex items-center gap-1.5 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all rounded-xl font-semibold px-3 py-1.5"
+          >
+            📊 Unduh Rekap Excel
+          </Button>
+        </div>
 
         {isLoading && transaksi.length === 0 ? (
           <div className="flex justify-center py-12"><LoadingSpinner /></div>
