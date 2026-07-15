@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 
 const AuthContext = createContext(null);
-const API_URL = "https://aloca-backend-production.up.railway.app/api";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);

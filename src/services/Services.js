@@ -1,4 +1,4 @@
-const API_URL = "https://aloca-backend-production.up.railway.app/api";
+const API_URL = import.meta.env.VITE_API_URL;
 
 // Helper: request JSON dengan JWT otomatis
 const fetchWithAuth = async (endpoint, options = {}) => {
